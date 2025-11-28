@@ -44,5 +44,10 @@
       "typedRoutes": true,
       "reactCompiler": true
     }
+    ,
+    "updates": {
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

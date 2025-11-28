@@ -36,7 +36,8 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
   passwordInput: {
-    flex: 1,
+    width: '100%',
+    marginBottom: 12,
   },
   buttonsContainer: {
     marginTop: 12,

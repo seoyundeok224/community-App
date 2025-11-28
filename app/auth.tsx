@@ -1,27 +1,41 @@
 import AuthButton from "@/components/AuthButton";
 import PasswordInput from "@/components/PasswordInput";
+import { Colors } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import {
-    onAuthStateChanged,
-    sendPasswordResetEmail,
-    signInWithEmailAndPassword
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword
 } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleProp,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ViewStyle,
 } from "react-native";
 
 import { styles } from "./AuthScreen.styles";
 import { auth } from "./firebase";
 
+// Set the navigation header title shown in the top bar for this route
+// Show a friendly title in the native/header bar instead of the file name
+// hide the router/native header and render our own in-screen title
+export const options = {
+  headerShown: false,
+};
+
 export default function AuthScreen() {
   const router = useRouter();
+  const emailRef = useRef<TextInput | null>(null);
+  const [emailFocused, setEmailFocused] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -29,12 +43,6 @@ export default function AuthScreen() {
   const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace("/(tabs)"); // 로그인 되어있으면 탭 화면으로 이동
-      }
-    });
-    return unsubscribe;
   }, [router]);
 
   const validateEmail = (text: string) => {
@@ -75,30 +83,49 @@ export default function AuthScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <View style={styles.headerBar}>
+          <Text style={styles.headerTitle}>로그인</Text>
+        </View>
         <View style={styles.header}>
-          <Text style={styles.logoText}>Community App</Text>
           <Text style={styles.subtitle}>간편하게 로그인하세요</Text>
         </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <TextInput
-          style={styles.input}
-          placeholder="이메일"
-          value={email}
-          onChangeText={validateEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoComplete="email"
-          textContentType="emailAddress"
-        />
+        <View style={{ width: '100%', marginBottom: 8 }}>
+          <Pressable onPress={() => emailRef.current?.focus()} style={{ borderRadius: 10 }} accessibilityRole="button" accessibilityLabel="이메일 입력 상자">
+            <View style={[{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, backgroundColor: Colors.light.background } as StyleProp<ViewStyle>, { borderColor: emailFocused ? Colors.light.tint : Colors.light.icon }]}>
+              <Ionicons name="mail-outline" size={20} color="#666" style={{ marginRight: 8 }} />
+              <TextInput
+                ref={emailRef}
+                style={[styles.input, { borderWidth: 0, paddingVertical: 12 }]}
+                placeholder="이메일"
+                value={email}
+                onChangeText={validateEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+                accessibilityLabel="이메일 입력"
+              />
+              {email.length > 0 && (
+                <TouchableOpacity onPress={() => { setEmail(''); setEmailError(null); }} style={{ padding: 6 }} accessibilityRole="button">
+                  <Ionicons name="close-circle" size={18} color="#666" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </Pressable>
+        </View>
         {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
         <PasswordInput
           value={password}
           onChangeText={(t: string) => setPassword(t)}
           placeholder="비밀번호"
-          style={styles.passwordInput}
+          containerStyle={styles.passwordInput}
+          accessibilityLabel="비밀번호 입력"
         />
 
         <Text onPress={handleResetPassword} style={styles.linkText} accessibilityRole="button">
