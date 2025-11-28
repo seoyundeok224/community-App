@@ -4,22 +4,22 @@ import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import {
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword
+    sendPasswordResetEmail,
+    signInWithEmailAndPassword
 } from "firebase/auth";
 import { useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleProp,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  ViewStyle,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleProp,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    ViewStyle,
 } from "react-native";
 
 import { styles } from "./AuthScreen.styles";
@@ -80,7 +80,8 @@ export default function AuthScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 80}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.headerBar}>
@@ -94,11 +95,11 @@ export default function AuthScreen() {
 
         <View style={{ width: '100%', marginBottom: 8 }}>
           <Pressable onPress={() => emailRef.current?.focus()} style={{ borderRadius: 10 }} accessibilityRole="button" accessibilityLabel="이메일 입력 상자">
-            <View style={[{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, backgroundColor: Colors.light.background } as StyleProp<ViewStyle>, { borderColor: emailFocused ? Colors.light.tint : Colors.light.icon }]}>
+            <View style={[{ position: 'relative', flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, backgroundColor: Colors.light.background } as StyleProp<ViewStyle>, { borderColor: emailFocused ? Colors.light.tint : Colors.light.icon }]}>
               <Ionicons name="mail-outline" size={20} color="#666" style={{ marginRight: 8 }} />
               <TextInput
                 ref={emailRef}
-                style={[styles.input, { borderWidth: 0, paddingVertical: 12 }]}
+                style={[styles.input, { borderWidth: 0, paddingVertical: 12, paddingRight: 40 }]}
                 placeholder="이메일"
                 value={email}
                 onChangeText={validateEmail}
@@ -110,8 +111,8 @@ export default function AuthScreen() {
                 onBlur={() => setEmailFocused(false)}
                 accessibilityLabel="이메일 입력"
               />
-              {email.length > 0 && (
-                <TouchableOpacity onPress={() => { setEmail(''); setEmailError(null); }} style={{ padding: 6 }} accessibilityRole="button">
+              {emailFocused && email.length > 0 && (
+                <TouchableOpacity onPress={() => { setEmail(''); setEmailError(null); emailRef.current?.focus(); }} style={{ position: 'absolute', right: 8, padding: 6, height: 36, justifyContent: 'center' }} accessibilityRole="button" accessibilityLabel="이메일 지우기">
                   <Ionicons name="close-circle" size={18} color="#666" />
                 </TouchableOpacity>
               )}

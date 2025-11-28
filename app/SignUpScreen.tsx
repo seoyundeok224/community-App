@@ -65,11 +65,10 @@ export default function SignUpScreen() {
   const pickAvatar = async () => {
     try {
       // dynamic import to avoid hard dependency when package isn't installed
-      // @ts-ignore -- optional dependency, import at runtime if present
-      // eslint-disable-next-line import/no-unresolved
       const ImagePicker = await import('expo-image-picker');
       const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6, allowsEditing: true, aspect: [1,1] });
-      if (!res.cancelled) setAvatarUri((res as any).uri ?? null);
+      const anyRes = res as any;
+      if (!anyRes.canceled) setAvatarUri(anyRes.uri ?? anyRes.assets?.[0]?.uri ?? null);
     } catch {
       Alert.alert('패키지 필요', '프로필 사진 기능을 사용하려면 expo-image-picker를 설치하세요.\n`expo install expo-image-picker`');
     }

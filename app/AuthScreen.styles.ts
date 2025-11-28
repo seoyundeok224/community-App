@@ -3,9 +3,10 @@ import { StyleSheet } from "react-native";
 export const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     paddingHorizontal: 20,
     paddingVertical: 40,
+    paddingBottom: 100,
     backgroundColor: "#f5f7fa",
   },
   input: {
@@ -20,6 +21,17 @@ export const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     marginBottom: 24,
+  },
+  headerBar: {
+    width: '100%',
+    paddingVertical: 8,
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2b6cb0',
   },
   logoText: {
     fontSize: 30,
