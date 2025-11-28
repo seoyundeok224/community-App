@@ -128,6 +128,18 @@ export default function HomeScreen() {
             style={styles.input}
             accessibilityLabel="새 항목 입력"
           />
+
+          {/* 이미지 미리보기 + 선택 버튼을 입력 행에 통합 */}
+          {imageUri ? (
+            <Pressable onPress={() => openViewer(imageUri)} accessibilityRole="imagebutton" accessibilityLabel="첨부 이미지 보기">
+              <Image source={{ uri: imageUri }} style={styles.previewSmall as any} />
+            </Pressable>
+          ) : (
+            <TouchableOpacity onPress={pickImage} style={styles.imagePlaceholder} accessibilityRole="button" accessibilityLabel="이미지 첨부">
+              <Ionicons name="image" size={20} color="#9aa" />
+            </TouchableOpacity>
+          )}
+
           {editingItemId ? (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity onPress={addItem} style={styles.addButton} accessibilityRole="button" accessibilityLabel="항목 수정">
@@ -225,13 +237,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        <ThemedText type="subtitle">이미지 첨부</ThemedText>
-        <View style={{ marginBottom: 12 }}>
-          {imageUri ? <Image source={{ uri: imageUri }} style={styles.preview as any} /> : null}
-          <TouchableOpacity onPress={pickImage} style={styles.addButton} accessibilityRole="button" accessibilityLabel="이미지 첨부">
-            <ThemedText style={{ color: '#fff' }}>{imageUri ? '이미지 변경' : '이미지 첨부'}</ThemedText>
-          </TouchableOpacity>
-        </View>
+        {/* 이미지 첨부 UI를 항목 입력 행과 통합했습니다. */}
 
         <Modal visible={!!viewerUri} transparent animationType="fade" onRequestClose={closeViewer}>
           <View style={styles.modalBackdrop}>
@@ -263,6 +269,8 @@ const styles = StyleSheet.create({
   itemSelected: { borderColor: '#0a7ea4', borderWidth: 2 },
   itemImage: { width: '100%', height: 140, marginTop: 8, borderRadius: 8 },
   preview: { width: '100%', height: 200, borderRadius: 8, marginBottom: 8 },
+  previewSmall: { width: 56, height: 56, borderRadius: 8, marginLeft: 8 },
+  imagePlaceholder: { width: 56, height: 56, borderRadius: 8, marginLeft: 8, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f4f6' },
   comment: { padding: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   deleteButton: { marginLeft: 8, padding: 6 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
