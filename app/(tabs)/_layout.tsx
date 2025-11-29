@@ -1,9 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Keyboard, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Keyboard, Platform, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol } from '@/components/ui/IconSymbol'; // string 타입으로 안전하게
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -15,16 +16,27 @@ export default function TabLayout() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
+  const tabTranslate = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
     const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
     return () => {
-      showSub.remove(); hideSub.remove();
+      showSub.remove();
+      hideSub.remove();
     };
   }, []);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, user => {
+    Animated.timing(tabTranslate, {
+      toValue: keyboardVisible || isAuthenticated !== true ? 100 : 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [keyboardVisible, isAuthenticated]);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
       setIsAuthenticated(!!user);
     });
     return () => unsub();
@@ -33,13 +45,44 @@ export default function TabLayout() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-    } catch {
-      // ignore sign out errors
-    }
+    } catch {}
     setIsAuthenticated(false);
     router.replace('/auth');
   };
- 
+
+  const renderTabIcon = (name: string, focused: boolean) => {
+    const scale = new Animated.Value(1);
+
+    const onPressIn = () =>
+      Animated.spring(scale, { toValue: 1.2, useNativeDriver: true }).start();
+    const onPressOut = () =>
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
+
+    return (
+      <Animated.View
+        style={[
+          styles.iconBg,
+          {
+            transform: [{ scale }],
+            backgroundColor: focused
+              ? Colors[colorScheme ?? 'light'].tint
+              : 'transparent',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: focused ? 0.2 : 0,
+            shadowRadius: 5,
+            elevation: focused ? 5 : 0,
+          },
+        ]}
+      >
+        <IconSymbol
+          size={24}
+          name={name}
+          color={focused ? '#fff' : Colors[colorScheme ?? 'light'].text}
+        />
+      </Animated.View>
+    );
+  };
 
   return (
     <Tabs
@@ -48,59 +91,81 @@ export default function TabLayout() {
         headerShown: true,
         headerTitleAlign: 'center',
         headerStyle: { backgroundColor: Colors[colorScheme ?? 'light'].background },
-        // hide the tabBar item for any route that is not index/explore
-        tabBarItemStyle: (route.name === 'index' || route.name === 'explore') ? undefined : { width: 0, padding: 0, display: 'none' },
+        tabBarItemStyle:
+          route.name === 'index' || route.name === 'explore'
+            ? undefined
+            : { width: 0, padding: 0, display: 'none' },
         tabBarButton: (props) => {
-          if (route.name === 'index') return <HapticTab {...props as any} position="left" />;
-          if (route.name === 'explore') return <HapticTab {...props as any} position="right" />;
+          if (route.name === 'index') return <HapticTab {...(props as any)} position="left" />;
+          if (route.name === 'explore') return <HapticTab {...(props as any)} position="right" />;
           return null;
         },
         tabBarShowLabel: true,
         tabBarLabelStyle: { fontSize: 12, marginBottom: 6 },
-        tabBarStyle: [{
-          position: 'absolute',
-          left: 16,
-          right: 16,
-          bottom: Platform.OS === 'ios' ? 24 : 12,
-          height: 64,
-          borderRadius: 16,
-          paddingHorizontal: 12,
-          backgroundColor: Colors[colorScheme ?? 'light'].background,
-          // hide tab bar until auth state is known and user is authenticated
-          display: keyboardVisible || isAuthenticated !== true ? 'none' : 'flex'
-        }],
+        tabBarStyle: [
+          {
+            position: 'absolute',
+            left: 16,
+            right: 16,
+            bottom: Platform.OS === 'ios' ? 28 : 16,
+            height: 80,
+            borderRadius: 28,
+            paddingHorizontal: 16,
+            paddingTop: 8,
+            transform: [{ translateY: tabTranslate }],
+            backgroundColor: Colors[colorScheme ?? 'light'].background + 'CC',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.1,
+            shadowRadius: 10,
+            elevation: 5,
+            overflow: 'hidden',
+          },
+        ],
         headerRight: () => (
-          <TouchableOpacity onPress={handleLogout} accessibilityRole="button">
-            <Text style={{ marginRight: 12, color: Colors[colorScheme ?? 'light'].tint }}>로그아웃</Text>
+          <TouchableOpacity
+            onPress={handleLogout}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginRight: 12,
+              padding: 6,
+              borderRadius: 8,
+              backgroundColor: '#f0f0f0',
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={18}
+              color={Colors[colorScheme ?? 'light'].tint}
+            />
+            <Text
+              style={{
+                marginLeft: 6,
+                color: Colors[colorScheme ?? 'light'].tint,
+              }}
+            >
+              로그아웃
+            </Text>
           </TouchableOpacity>
         ),
-      })}>
+      })}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconWrap}>
-              <View style={[styles.iconBg, focused && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}> 
-                <IconSymbol size={22} name="house.fill" color={focused ? '#fff' : color} />
-              </View>
-            </View>
-          ),
-          tabBarButton: (props) => <HapticTab {...props as any} position="left" />,
+          tabBarIcon: ({ focused }) => renderTabIcon('home', focused),
+          tabBarButton: (props) => <HapticTab {...(props as any)} position="left" />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           title: 'Explore',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconWrap}>
-              <View style={[styles.iconBg, focused && { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}> 
-                <IconSymbol size={22} name="paperplane.fill" color={focused ? '#fff' : color} />
-              </View>
-            </View>
-          ),
-          tabBarButton: (props) => <HapticTab {...props as any} position="right" />,
+          tabBarIcon: ({ focused }) => renderTabIcon('paper-plane', focused),
+          tabBarButton: (props) => <HapticTab {...(props as any)} position="right" />,
         }}
       />
     </Tabs>
@@ -108,14 +173,10 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  iconWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   iconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',

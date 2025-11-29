@@ -3,11 +3,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  FlatList,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -50,12 +50,13 @@ export default function DiaryScreen() {
   const [entries, setEntries] = useState<Record<string, DiaryEntry[]>>({});
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [showInput, setShowInput] = useState(true);
+
+  const scrollRef = useRef<ScrollView | null>(null);
   const inputRef = useRef<TextInput | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // 날짜 전환 애니메이션
   const fadeAnim = useState(new Animated.Value(1))[0];
-
   const animateMonth = () => {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
@@ -78,6 +79,19 @@ export default function DiaryScreen() {
   useEffect(() => {
     setDiaryText('');
   }, [selectedDate]);
+
+  // 키보드 이벤트
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const addEntry = () => {
     const text = diaryText.trim();
@@ -139,18 +153,13 @@ export default function DiaryScreen() {
 
   const list = (selectedDate ? (entries[selectedDate] || []) : []).slice().sort((a, b) => b.createdAt - a.createdAt);
 
-  // Calendar grid
   const calendarGrid = useMemo(() => {
     const { year, month } = yearMonth;
     const first = getFirstDay(year, month);
     const days = getDaysInMonth(year, month);
-
-    const cells: Array<
-      { type: 'empty' } | { type: 'day'; day: number; key: string }
-    > = [];
+    const cells: Array<{ type: 'empty' } | { type: 'day'; day: number; key: string }> = [];
 
     for (let i = 0; i < first; i++) cells.push({ type: 'empty' });
-
     for (let d = 1; d <= days; d++)
       cells.push({ type: 'day', day: d, key: `${year}-${month + 1}-${d}` });
 
@@ -158,85 +167,83 @@ export default function DiaryScreen() {
   }, [yearMonth]);
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* Header */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => changeMonth(-1)}>
-          <Text style={styles.iconBtnText}>{'‹'}</Text>
-        </TouchableOpacity>
-
-        <View style={styles.titleWrap}>
-          <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
-            {yearMonth.year}년 {yearMonth.month + 1}월
-          </Text>
-          <Text style={styles.subtitle}>{new Date(yearMonth.year, yearMonth.month, 1).toLocaleString('ko-KR', { month: 'long' })}</Text>
-        </View>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity style={styles.todayBtn} onPress={goToday}>
-            <Text style={styles.todayBtnText}>오늘</Text>
+    <View style={styles.container}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={{ padding: 16, paddingBottom: keyboardHeight + 20 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => changeMonth(-1)}>
+            <Text style={styles.iconBtnText}>{'‹'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => changeMonth(1)}>
-            <Text style={styles.iconBtnText}>{'›'}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      <Animated.View style={{ opacity: fadeAnim }}>
-        {/* Week header */}
-        <View style={styles.weekHeader}>
-          {['일', '월', '화', '수', '목', '금', '토'].map((w) => (
-            <Text key={w} style={styles.weekText}>
-              {w}
+          <View style={styles.titleWrap}>
+            <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
+              {yearMonth.year}년 {yearMonth.month + 1}월
             </Text>
-          ))}
+            <Text style={styles.subtitle}>{new Date(yearMonth.year, yearMonth.month, 1).toLocaleString('ko-KR', { month: 'long' })}</Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity style={styles.todayBtn} onPress={goToday}>
+              <Text style={styles.todayBtnText}>오늘</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => changeMonth(1)}>
+              <Text style={styles.iconBtnText}>{'›'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Calendar Grid */}
-        <View style={styles.calendarGrid}>
-          {calendarGrid.map((cell, idx) => {
-            if (cell.type === 'empty') return <View key={`e-${idx}`} style={styles.dayCellEmpty} />;
+        {/* Week header */}
+        <Animated.View style={{ opacity: fadeAnim }}>
+          <View style={styles.weekHeader}>
+            {['일', '월', '화', '수', '목', '금', '토'].map((w) => (
+              <Text key={w} style={styles.weekText}>{w}</Text>
+            ))}
+          </View>
 
-            const dateKey = dateToKey(new Date(yearMonth.year, yearMonth.month, cell.day));
-            const isSel = dateKey === selectedDate;
-            const isTod = dateKey === today;
-            const hasNote = entries[dateKey]?.length > 0;
-            const first = getFirstDay(yearMonth.year, yearMonth.month);
-            const wk = (cell.day - 1 + first) % 7;
-            const weekend = wk === 0 || wk === 6;
+          {/* Calendar Grid */}
+          <View style={styles.calendarGrid}>
+            {calendarGrid.map((cell, idx) => {
+              if (cell.type === 'empty') return <View key={`e-${idx}`} style={styles.dayCellEmpty} />;
+              const dateKey = dateToKey(new Date(yearMonth.year, yearMonth.month, cell.day));
+              const isSel = dateKey === selectedDate;
+              const isTod = dateKey === today;
+              const hasNote = entries[dateKey]?.length > 0;
+              const first = getFirstDay(yearMonth.year, yearMonth.month);
+              const wk = (cell.day - 1 + first) % 7;
+              const weekend = wk === 0 || wk === 6;
 
-            return (
-              <TouchableOpacity
-                key={cell.key}
-                style={[styles.dayCell, weekend && styles.weekendCell]}
-                onPress={() => {
-                  if (selectedDate === dateKey) {
-                    setSelectedDate('');
-                    setShowInput(false);
-                    inputRef.current?.blur();
-                  } else {
-                    setSelectedDate(dateKey);
-                    setShowInput(true);
-                    setTimeout(() => inputRef.current?.focus(), 80);
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.dayInner, isSel && styles.dayInnerSel]}>
-                  <Text style={[styles.dayNumber, isSel && styles.dayNumberSel, weekend && styles.weekendText]}>{cell.day}</Text>
-                </View>
+              return (
+                <TouchableOpacity
+                  key={cell.key}
+                  style={[styles.dayCell, weekend && styles.weekendCell]}
+                  onPress={() => {
+                    if (selectedDate === dateKey) {
+                      setSelectedDate('');
+                      inputRef.current?.blur();
+                    } else {
+                      setSelectedDate(dateKey);
+                      setTimeout(() => inputRef.current?.focus(), 80);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.dayInner, isSel && styles.dayInnerSel]}>
+                    <Text style={[styles.dayNumber, isSel && styles.dayNumberSel, weekend && styles.weekendText]}>{cell.day}</Text>
+                  </View>
+                  {hasNote && !isSel && <View style={styles.dot} />}
+                  {isTod && !isSel && <View style={styles.todayRing} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Animated.View>
 
-                {hasNote && !isSel && <View style={styles.dot} />}
-                {isTod && !isSel && <View style={styles.todayRing} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </Animated.View>
-
-      {/* 입력창 */}
-      {showInput && (
-        <View style={styles.inputContainer}>
+        {/* 입력창 + 추가 버튼 */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 12 }}>
           <TextInput
             ref={inputRef}
             style={styles.input}
@@ -247,40 +254,49 @@ export default function DiaryScreen() {
           />
           <TouchableOpacity
             disabled={!diaryText.trim()}
-            style={[styles.addBtn, !diaryText.trim() && { opacity: 0.5 }]}
             onPress={addEntry}
+            style={{ marginLeft: 8, flexShrink: 0 }}
           >
-            <Text style={styles.addBtnText}>추가</Text>
+            <LinearGradient
+              colors={['#10b981', '#059669']}
+              style={[styles.input, { 
+                paddingHorizontal: 16, 
+                justifyContent: 'center', 
+                borderRadius: 12, 
+                borderWidth: 0, // 테두리 제거
+                borderColor: 'transparent',
+                minHeight: 60, // 입력창과 동일 높이
+              }]}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700', textAlign: 'center' }}>추가</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
-      )}
 
-      {/* 리스트 */}
-      <FlatList
-        data={list}
-        keyExtractor={(i) => i.id}
-        ListEmptyComponent={<Text style={styles.emptyText}>기록 없음</Text>}
-        contentContainerStyle={{ paddingBottom: 80 }}
-        renderItem={({ item }) => (
-          <Pressable onLongPress={() => startEdit(item)} style={styles.entryWrap}>
-            <LinearGradient colors={['#ffffff', '#f8fafc']} style={[styles.entryCard, THEME.cardShadow]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.entryText} numberOfLines={3}>{item.text}</Text>
-                <Text style={styles.tsText}>입력: {new Date(item.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</Text>
-              </View>
-
-              <View style={styles.entryActions}>
-                <TouchableOpacity style={styles.editBtn} onPress={() => startEdit(item)}>
-                  <Text style={styles.editText}>수정</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.delBtn} onPress={() => removeEntry(item.id)}>
-                  <Text style={styles.delText}>삭제</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-          </Pressable>
+        {/* 리스트 */}
+        {list.length === 0 ? (
+          <Text style={styles.emptyText}>기록 없음</Text>
+        ) : (
+          list.map((item) => (
+            <Pressable key={item.id} onLongPress={() => startEdit(item)} style={styles.entryWrap}>
+              <LinearGradient colors={['#ffffff', '#f8fafc']} style={[styles.entryCard, THEME.cardShadow]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.entryText} numberOfLines={3}>{item.text}</Text>
+                  <Text style={styles.tsText}>입력: {new Date(item.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</Text>
+                </View>
+                <View style={styles.entryActions}>
+                  <TouchableOpacity style={styles.editBtn} onPress={() => startEdit(item)}>
+                    <Text style={styles.editText}>수정</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.delBtn} onPress={() => removeEntry(item.id)}>
+                    <Text style={styles.delText}>삭제</Text>
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
+            </Pressable>
+          ))
         )}
-      />
+      </ScrollView>
 
       {/* 수정 모달 */}
       <Modal visible={showModal} transparent animationType="fade">
@@ -293,17 +309,12 @@ export default function DiaryScreen() {
               multiline
               onChangeText={(t) => setEditing((s) => s ? { ...s, text: t } : null)}
             />
-
             <View style={styles.modalRow}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setShowModal(false)}>
                 <Text>취소</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
-                style={[
-                  styles.modalBtnSave,
-                  !editing?.text.trim() && { opacity: 0.5 }
-                ]}
+                style={[styles.modalBtnSave, !editing?.text.trim() && { opacity: 0.5 }]}
                 disabled={!editing?.text.trim()}
                 onPress={saveEdit}
               >
@@ -313,29 +324,22 @@ export default function DiaryScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-
-  /* HEADER */
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  container: { flex: 1, backgroundColor: '#fff' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingHorizontal: 16, marginTop: Platform.OS === 'ios' ? 40 : 0 },
   headerTitle: { fontWeight: '700', fontSize: 18 },
-  navBtn: { padding: 8 },
   iconBtn: { padding: 8, borderRadius: 8, backgroundColor: '#f8fafc', marginHorizontal: 4 },
   iconBtnText: { fontSize: 18, color: '#111827' },
   titleWrap: { alignItems: 'center' },
   subtitle: { fontSize: 12, color: '#6b7280' },
   todayBtn: { backgroundColor: THEME.primary, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, marginRight: 8 },
   todayBtnText: { color: '#fff', fontWeight: '700' },
-
-  /* WEEK */
-  weekHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  weekHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, paddingHorizontal: 2 },
   weekText: { width: '14.2857%', textAlign: 'center', fontWeight: '600' },
-
-  /* CALENDAR */
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   dayCell: { width: '14.2857%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', position: 'relative', padding: 6 },
   dayCellEmpty: { width: '14.2857%', aspectRatio: 1, padding: 6 },
@@ -344,67 +348,11 @@ const styles = StyleSheet.create({
   dayInnerSel: { backgroundColor: THEME.primary },
   dayNumber: { fontSize: 14, color: '#111827' },
   dayNumberSel: { color: '#fff', fontWeight: '700' },
-  dayText: { fontSize: 14 },
   weekendText: { color: THEME.weekendText },
-
-  daySelected: {
-    width: '95%',
-    height: '95%',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dayTextSelected: { color: '#fff', fontWeight: '700' },
-
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: THEME.warning,
-    position: 'absolute',
-    bottom: 6,
-  },
-
-  todayRing: {
-    position: 'absolute',
-    width: '80%',
-    height: '80%',
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: THEME.primary,
-  },
-
-  /* INPUT */
-  inputContainer: { flexDirection: 'row', marginTop: 12, alignItems: 'flex-end' },
-  input: {
-    flex: 1,
-    minHeight: 60,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
-    padding: 10,
-    backgroundColor: '#fff',
-  },
-  addBtn: {
-    marginLeft: 12,
-    backgroundColor: THEME.secondary,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addBtnText: { color: '#fff', fontWeight: '700' },
-
-  /* ENTRY CARD */
-  entryCard: {
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: THEME.warning, position: 'absolute', bottom: 6 },
+  todayRing: { position: 'absolute', width: '80%', height: '80%', borderRadius: 999, borderWidth: 1.5, borderColor: THEME.primary },
+  input: { flex: 1, minHeight: 60, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12, padding: 10, backgroundColor: '#fff' },
+  entryCard: { backgroundColor: '#fff', padding: 14, borderRadius: 12, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between' },
   entryWrap: { marginBottom: 8 },
   entryActions: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
   editBtn: { backgroundColor: '#f3f4f6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginRight: 8 },
@@ -413,35 +361,12 @@ const styles = StyleSheet.create({
   tsText: { fontSize: 12, color: '#6b7280' },
   delBtn: { backgroundColor: THEME.danger, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   delText: { color: '#fff' },
-
   emptyText: { textAlign: 'center', marginTop: 10, color: '#6b7280' },
-
-  /* MODAL */
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
   modalBox: { width: '90%', backgroundColor: '#fff', padding: 16, borderRadius: 12 },
   modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
-  modalInput: {
-    minHeight: 120,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 14,
-    textAlignVertical: 'top',
-  },
+  modalInput: { minHeight: 120, borderWidth: 1, borderColor: '#e5e7eb', padding: 10, borderRadius: 10, marginBottom: 14, textAlignVertical: 'top' },
   modalRow: { flexDirection: 'row', justifyContent: 'flex-end' },
-  modalBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  modalBtnSave: {
-    backgroundColor: THEME.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
+  modalBtn: { paddingVertical: 10, paddingHorizontal: 14, backgroundColor: '#f3f4f6', borderRadius: 8, marginLeft: 8 },
+  modalBtnSave: { backgroundColor: THEME.primary, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginLeft: 8 },
 });
